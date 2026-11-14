@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+node_modules/
+dist/
+data/
+characters/
+projects/
+exports/
+backups/
+fonts/
+*.sqlite
+*.sqlite3
+*.db
+*.log
