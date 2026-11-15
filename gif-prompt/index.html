@@ -3,6 +3,7 @@
 body{font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;margin:0;background:#f6f3ee;color:#333;line-height:1.5}
 main{max-width:640px;margin:0 auto;padding:12px}
 h1{font-size:20px;margin:8px 0}h2{font-size:16px;margin:0 0 8px}
+[hidden]{display:none!important}
 section{background:#fff;border-radius:12px;padding:12px;margin:12px 0;box-shadow:0 1px 3px #0002}
 label{display:block;margin:8px 0}select,input,textarea,button{font:inherit;box-sizing:border-box}
 select,input[type=number],textarea{width:100%;padding:8px;border:1px solid #ccc;border-radius:8px}
@@ -20,7 +21,7 @@ small{display:block;color:#777;margin:4px 0}
 
 <section><h2>1. 共通設定</h2>
 <label>犬の特徴（参考写真も添付してください）<textarea id="dog" rows="3">添付した参考写真の犬をモデルにし、顔・毛色・毛並み・耳・体型の特徴を全コマで同じに保つ。</textarea></label>
-<label>タッチ<select id="touch"><option>写真のようにリアル（添付GIFのような質感）</option><option>かわいいイラスト</option><option>水彩イラスト</option><option>ぬいぐるみ風の3D</option></select></label>
+<label>プロンプトの形式<select id="mode"><option value="short">短縮版（ChatGPTのプロジェクトに共通指示と参考画像を登録済み）</option><option value="full">フル版（毎回、参考画像を添付する）</option></select></label><label>タッチ<select id="touch"><option>写真のようにリアル（参考画像のような質感）</option><option>かわいいイラスト</option><option>水彩イラスト</option><option>ぬいぐるみ風の3D</option></select></label>
 <label>背景（白い犬は白以外がおすすめ）<select id="bg"><option value="transparent">透過（背景なし）</option><option value="#BFE3FF">水色 #BFE3FF</option><option value="#C8F0DC">ミント #C8F0DC</option><option value="#FFD6E5">ピンク #FFD6E5</option><option value="#E6E6E6">薄グレー #E6E6E6</option><option value="#FFFFFF">白 #FFFFFF</option></select></label>
 <label>コマ数<select id="frames"><option value="6">6コマ（3×2）</option><option value="8">8コマ（4×2）</option><option value="12" selected>12コマ（4×3）</option></select></label>
 <label>再生時間（秒）<select id="sec"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></label>
@@ -29,11 +30,12 @@ small{display:block;color:#777;margin:4px 0}
 
 </section>
 
+<section id="cs"><h2>0. 最初に1回だけ：ChatGPTのプロジェクトに登録</h2><small>①ChatGPTで「新しいプロジェクト」を作る ②下の文章を「プロジェクトの指示」に貼る ③参考画像をプロジェクトのファイルに入れる。以後は、そのプロジェクトで短縮版のプロンプトを貼るだけ（毎回の添付が不要）。</small><textarea id="pc" rows="10" readonly></textarea><button id="cc">共通指示をコピー</button></section>
 <section><h2>2. パターンを選ぶ（27個）</h2><div id="chips"></div>
 <label id="nm"></label><label>動きの内容（自由に書き換えられます）<textarea id="desc" rows="3"></textarea></label>
 <button id="prev" class="sub">◀ 前へ</button><button id="next" class="sub">次へ ▶</button></section>
 
-<section><h2>3. ChatGPTに貼るプロンプト</h2><small>参考写真（または見本GIF）を添付して、下の文章をそのまま貼ります。ChatGPTがGIFを作ってくれます。</small><textarea id="p" rows="20" readonly></textarea><button id="c">プロンプトをコピー</button><p id="status" role="status"></p></section>
+<section><h2>3. ChatGPTに貼るプロンプト</h2><small>短縮版は、登録したプロジェクトの中で貼るだけ。フル版は参考画像を添付して貼ります。</small><textarea id="p" rows="20" readonly></textarea><button id="c">プロンプトをコピー</button><p id="status" role="status"></p></section>
 </main>
 <script>
 const $=id=>document.getElementById(id);
@@ -69,16 +71,19 @@ const descs=PATTERNS.map(p=>p[1]);let idx=0;
 const st=s=>$('status').textContent=s;
 function layout(){let n=+$('frames').value;return n===6?[3,2]:n===8?[4,2]:[4,3]}
 function syncLoops(){let S=+$('sec').value,cur=+$('loops').value||1,n=Math.floor(4/S);$('loops').replaceChildren();for(let i=1;i<=n;i++){let o=document.createElement('option');o.value=i;o.textContent=i;$('loops').append(o)}$('loops').value=String(Math.min(cur,n))}
-function pr(){let [c,r]=layout(),n=c*r,[W,H]=$('size').value.split(',').map(Number),S=+$('sec').value,L=+$('loops').value||1,pt=PATTERNS[idx],bg=$('bg').value,tr=bg==='transparent',fn='dog-'+String(idx+1).padStart(2,'0')+'.gif',D=Math.round(1000*S/n),beats=[];
-for(let k=0;k<n;k++){let pc=Math.round(100*k/n);beats.push('  コマ'+(k+1)+'：動きの進み具合 '+pc+'%'+(k===0?'（基準ポーズ：'+pt[2]+'）':k===n/2?'（動きの頂点）':k===n-1?'（1コマ目に自然につながる直前の姿勢）':''))}
-return ['添付の参考画像の犬を主役にして、動くGIFを1つ作成してください。Pythonでの加工・描き直しは使わず、画像生成で各コマを作ってGIFにし、完成したら '+fn+' をダウンロードリンクで渡してください。','','■ 犬',$('dog').value.trim(),'■ タッチ',$('touch').value,'','■ 動き：'+pt[0],descs[idx],'・元のポーズ：'+pt[2]+'（最後は必ずこのポーズへ戻る）','・'+n+'コマを順に並べて1回の動きにする。最後のコマの次は1コマ目に滑らかにつながる（ループ）','・コマ割り：',beats.join('\n'),'','■ ずれ防止（最重要）','・カメラ固定。全コマで犬の大きさ（縮尺）を同じにする','・全コマで足元の位置（接地位置）と体の中心を同じにする。コマごとに犬が上下左右へずれない（ジャンプなど動きとして必要な移動以外）','・犬の色・毛量・顔つき・体型・服装は全コマで同じ。描き分けや作風のぶれを出さない','・手足・耳・毛が見切れない余白をとる','・背景は全コマ同じ'+(tr?'で透過。白い縁・色残り・ぼかしの影を出さない':'単色 '+bg+' のみ（グラデーション・影・床・模様なし）。犬の毛先と背景を混ぜない'),'・各コマを描くたびに、1コマ目と同じ構図・同じ位置・同じ大きさで描く','','■ GIFの仕様','・サイズ：'+W+'×'+H+'px','・'+n+'コマ、1コマ '+D+'ミリ秒（合計'+S+'秒）、ループ'+L+'回（再生時間×ループは4秒以内）','・1コマ目は静止画としても使うので、'+pt[2]+'の分かりやすい絵にする','・全コマが同じ絵にならない（少しずつ違う）','・ファイルサイズは1MB以下（超えたら色数を減らして再出力）','','■ 完成後','・サイズ・コマ数・合計秒数・ファイルサイズを一行で報告する','・犬がずれる、または背景が残るコマがある場合は、そのコマだけ作り直す'].filter((x,i,a)=>x!==''||a[i-1]!=='').join('\n')}
-function refresh(){$('nm').textContent='パターン '+(idx+1)+' / 27：'+PATTERNS[idx][0];$('desc').value=descs[idx];$('p').value=pr();[...$('chips').children].forEach((b,i)=>b.classList.toggle('on',i===idx))}
+function sp(){let [c,r]=layout(),n=c*r,[W,H]=$('size').value.split(',').map(Number),S=+$('sec').value,L=+$('loops').value||1,D=Math.round(1000*S/n),bg=$('bg').value,tr=bg==='transparent';return{n,W,H,S,L,D,bg,tr}}
+function commonText(){let {W,H,bg,tr}=sp();return ['あなたは、LINEアニメスタンプ用の「ずれない動くGIF」を作るアシスタントです。このプロジェクトに入っている参考画像の犬を主役にします。','','■ 犬',$('dog').value.trim().replace('添付した参考写真','プロジェクト内の参考画像'),'■ タッチ',$('touch').value,'','■ 共通ルール','・Pythonでの加工・描き直しは使わず、画像生成で各コマを作ってGIFにし、ダウンロードリンクで渡す','・カメラ固定。全コマで犬の大きさ・足元の位置・体の中心を同じにする（動きとして必要な移動以外はずらさない）','・犬の色・毛量・顔つき・体型・服装・小物は全コマで同じ。作風のぶれを出さない','・手足・耳・毛・小物が見切れない余白をとる','・背景は全コマ同じ'+(tr?'で透過。白い縁・色残り・ぼかしの影を出さない':'単色 '+bg+' のみ（グラデーション・影・床・模様なし）'),'・最後は必ず元のポーズに戻り、ループが自然につながる','・1コマ目は静止画としても使うので、分かりやすい基準ポーズにする','・全コマが同じ絵にならない（少しずつ違う）','・サイズ '+W+'×'+H+'px、ファイルサイズ1MB以下','・完成後に、サイズ・コマ数・合計秒数・ファイルサイズを一行で報告する。ずれや背景残りのコマがあれば、そのコマだけ作り直す'].join('\n')}
+function pr(){let {n,W,H,S,L,D,bg,tr}=sp(),pt=PATTERNS[idx],fn='dog-'+String(idx+1).padStart(2,'0')+'.gif',beats=[];
+for(let k=0;k<n;k++){let pc=Math.round(100*k/n);beats.push('  コマ'+(k+1)+'：動きの進み具合 '+pc+'%'+(k===0?'（元のポーズ）':k===n/2?'（動きの頂点）':k===n-1?'（1コマ目に自然につながる直前の姿勢）':''))}
+if($('mode').value==='short')return ['このプロジェクトの共通指示と参考画像を使って、動き「'+pt[0]+'」のGIFを1つ作ってください。完成したら '+fn+' をダウンロードリンクで渡してください。','','■ 動き：'+pt[0],descs[idx],'・'+n+'コマ、1コマ '+D+'ミリ秒（合計'+S+'秒）、ループ'+L+'回、サイズ '+W+'×'+H+'px','・コマ割り：',beats.join('\n')].join('\n');
+return ['添付の参考画像の犬を主役にして、動くGIFを1つ作成してください。完成したら '+fn+' をダウンロードリンクで渡してください。','','■ 動き：'+pt[0],descs[idx],'・'+n+'コマ、1コマ '+D+'ミリ秒（合計'+S+'秒）、ループ'+L+'回（再生時間×ループは4秒以内）','・コマ割り：',beats.join('\n'),'','■ 共通ルール',commonText().split('\n').slice(2).join('\n')].join('\n')}
+function refresh(){$('nm').textContent='パターン '+(idx+1)+' / 27：'+PATTERNS[idx][0];$('desc').value=descs[idx];$('pc').value=commonText();$('cs').hidden=$('mode').value!=='short';$('p').value=pr();[...$('chips').children].forEach((b,i)=>b.classList.toggle('on',i===idx))}
 PATTERNS.forEach((p,i)=>{let b=document.createElement('button');b.textContent=(i+1)+' '+p[0].slice(0,4);b.onclick=()=>{idx=i;refresh()};$('chips').append(b)});
 $('desc').oninput=()=>{descs[idx]=$('desc').value;$('p').value=pr()};
 $('prev').onclick=()=>{idx=(idx+26)%27;refresh()};$('next').onclick=()=>{idx=(idx+1)%27;refresh()};
 async function cp(id){let ta=$(id);try{await navigator.clipboard.writeText(ta.value);st('コピーしました')}catch{ta.select();st('選択した文章を手動でコピーしてください')}}
-$('c').onclick=()=>cp('p');
-['dog','touch','bg','frames','size','loops'].forEach(id=>$(id).addEventListener('change',refresh));$('dog').addEventListener('input',refresh);
+$('c').onclick=()=>cp('p');$('cc').onclick=()=>cp('pc');
+['mode','dog','touch','bg','frames','size','loops'].forEach(id=>$(id).addEventListener('change',refresh));$('dog').addEventListener('input',refresh);
 $('sec').onchange=()=>{syncLoops();refresh()};
 syncLoops();refresh();
 </script></html>
