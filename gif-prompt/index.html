@@ -23,7 +23,7 @@ small{display:block;color:#777;margin:4px 0}
 <label>犬の特徴（参考写真も添付してください）<textarea id="dog" rows="3">添付した参考写真の犬をモデルにし、顔・毛色・毛並み・耳・体型の特徴を全コマで同じに保つ。</textarea></label>
 <label>プロンプトの形式<select id="mode"><option value="short">短縮版（ChatGPTのプロジェクトに共通指示と参考画像を登録済み）</option><option value="full">フル版（毎回、参考画像を添付する）</option></select></label><label>タッチ<select id="touch"><option>写真のようにリアル（参考画像のような質感）</option><option>かわいいイラスト</option><option>水彩イラスト</option><option>ぬいぐるみ風の3D</option></select></label>
 <label>背景（白い犬は白以外がおすすめ）<select id="bg"><option value="transparent">透過（背景なし）</option><option value="#BFE3FF">水色 #BFE3FF</option><option value="#C8F0DC">ミント #C8F0DC</option><option value="#FFD6E5">ピンク #FFD6E5</option><option value="#E6E6E6">薄グレー #E6E6E6</option><option value="#FFFFFF">白 #FFFFFF</option></select></label>
-<label>コマ数（多いほどなめらか。LINEは5〜20コマ）<select id="frames"><option value="6">6コマ（3×2）</option><option value="8">8コマ（4×2）</option><option value="12">12コマ（4×3）</option><option value="16">16コマ（4×4）</option><option value="20" selected>20コマ（5×4・なめらか）</option></select></label>
+<label>1シートのテンプレート（横×縦。コマ数が多いほどなめらか、LINEは5〜20コマ）<select id="frames"><option value="3,2">3×2＝6コマ</option><option value="2,3">2×3＝6コマ</option><option value="4,2">4×2＝8コマ</option><option value="2,4">2×4＝8コマ</option><option value="3,3">3×3＝9コマ</option><option value="4,3">4×3＝12コマ</option><option value="3,4">3×4＝12コマ</option><option value="4,4">4×4＝16コマ</option><option value="5,4" selected>5×4＝20コマ（なめらか）</option><option value="4,5">4×5＝20コマ</option></select></label><label>作るもの<select id="out"><option value="gif">GIFを直接作る</option><option value="sheet">コマを並べた1枚のシート画像を作る</option></select></label>
 <label>再生時間（秒）<select id="sec"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
 <label>ループ回数（再生時間×ループ ≦ 4秒）<select id="loops"></select></label>
 <label>GIFのサイズ<select id="size"><option value="320,270">320×270（スタンプ）</option><option value="240,240">240×240（メイン画像）</option><option value="180,180">180×180（絵文字）</option><option value="362,362">362×362</option></select></label>
@@ -69,13 +69,14 @@ const PATTERNS=[
 ['おやすみ','前足をほおに当てて目を閉じ、おやすみのポーズをして、元へ戻る。','添付画像のポーズ']];
 const descs=PATTERNS.map(p=>p[1]);let idx=0;
 const st=s=>$('status').textContent=s;
-function layout(){let n=+$('frames').value;return n===6?[3,2]:n===8?[4,2]:n===12?[4,3]:n===16?[4,4]:[5,4]}
+function layout(){return $('frames').value.split(',').map(Number)}
 function syncLoops(){let S=+$('sec').value,cur=+$('loops').value||1,n=Math.floor(4/S);$('loops').replaceChildren();for(let i=1;i<=n;i++){let o=document.createElement('option');o.value=i;o.textContent=i;$('loops').append(o)}$('loops').value=String(Math.min(cur,n))}
 const SMOOTH='なめらかさ重視：隣り合うコマの差はごく小さくする（1コマで手足や頭が大きく動かない）。急に表情やポーズが変わるコマを作らない。動きの最初と最後はゆっくり、真ん中は少し速く（イーズイン・イーズアウト）。目・口・小物の位置も少しずつ変える';
-function sp(){let [c,r]=layout(),n=c*r,[W,H]=$('size').value.split(',').map(Number),S=+$('sec').value,L=+$('loops').value||1,D=Math.round(1000*S/n),bg=$('bg').value,tr=bg==='transparent';return{n,W,H,S,L,D,bg,tr}}
+function sp(){let [c,r]=layout(),n=c*r,[W,H]=$('size').value.split(',').map(Number),S=+$('sec').value,L=+$('loops').value||1,D=Math.round(1000*S/n),bg=$('bg').value,tr=bg==='transparent';return{c,r,n,W,H,S,L,D,bg,tr}}
 function commonText(){let {W,H,bg,tr}=sp();return ['あなたは、LINEアニメスタンプ用の「ずれない動くGIF」を作るアシスタントです。このプロジェクトに入っている参考画像の犬を主役にします。','','■ 犬',$('dog').value.trim().replace('添付した参考写真','プロジェクト内の参考画像'),'■ タッチ',$('touch').value,'','■ 共通ルール','・Pythonでの加工・描き直しは使わず、画像生成で各コマを作ってGIFにし、ダウンロードリンクで渡す','・カメラ固定。全コマで犬の大きさ・足元の位置・体の中心を同じにする（動きとして必要な移動以外はずらさない）','・犬の色・毛量・顔つき・体型・服装・小物は全コマで同じ。作風のぶれを出さない','・手足・耳・毛・小物が見切れない余白をとる','・背景は全コマ同じ'+(tr?'で透過。白い縁・色残り・ぼかしの影を出さない':'単色 '+bg+' のみ（グラデーション・影・床・模様なし）'),'・最後は必ず元のポーズに戻り、ループが自然につながる','・'+SMOOTH,'・1コマ目は静止画としても使うので、分かりやすい基準ポーズにする','・全コマが同じ絵にならない（少しずつ違う）','・サイズ '+W+'×'+H+'px、ファイルサイズ1MB以下','・完成後に、サイズ・コマ数・合計秒数・ファイルサイズを一行で報告する。ずれや背景残りのコマがあれば、そのコマだけ作り直す'].join('\n')}
-function pr(){let {n,W,H,S,L,D,bg,tr}=sp(),pt=PATTERNS[idx],fn='dog-'+String(idx+1).padStart(2,'0')+'.gif',beats=[];
+function pr(){let {c,r,n,W,H,S,L,D,bg,tr}=sp(),pt=PATTERNS[idx],fn='dog-'+String(idx+1).padStart(2,'0')+'.gif',beats=[];
 for(let k=0;k<n;k++){let pc=Math.round(100*(1-Math.cos(2*Math.PI*k/n))/2);beats.push('  コマ'+(k+1)+'：動きの大きさ '+pc+'%'+(k===0?'（元のポーズ）':k*2===n?'（動きの頂点）':k===n-1?'（元のポーズの直前）':''))}
+if($('out').value==='sheet'){let sb=tr?'#BFE3FF':bg,sh=['■ 動き：'+pt[0],descs[idx],'・元のポーズから始まり、最後は元のポーズの直前で終わる（次に1コマ目へつながる）','・コマ割り（0%＝元のポーズ、100%＝動きの頂点）：',beats.join('\n'),'・'+SMOOTH,'','■ シートの形式（厳守）','・横'+c+'×縦'+r+'の格子、全'+n+'コマ、各コマは同じ大きさの正方形','・並び順は左上→右へ→次の段（1コマ目が左上）','・コマの間に枠線・隙間・番号・文字を入れない','・カメラ固定。全コマで犬の大きさ・足元の位置・体の中心を同じにする。コマごとにずれない','・犬の色・毛量・顔つき・体型・服装・小物は全コマで同じ','・手足・耳・毛・小物が見切れない余白を各コマにとる','・背景は全コマ同じ単色 '+sb+' のみ（グラデーション・影・床・模様なし）。犬の毛先と背景を混ぜない'];return($('mode').value==='short'?['このプロジェクトの共通指示と参考画像を使って、動き「'+pt[0]+'」の連続コマシート画像を1枚作ってください。（GIFにするのは後で行います）']:['添付の参考画像の犬を主役にして、動き「'+pt[0]+'」の連続コマシート画像を1枚作ってください。（GIFにするのは後で行います）','','■ 犬',$('dog').value.trim(),'■ タッチ',$('touch').value]).concat(['',...sh]).join('\n')}
 if($('mode').value==='short')return ['このプロジェクトの共通指示と参考画像を使って、動き「'+pt[0]+'」のGIFを1つ作ってください。完成したら '+fn+' をダウンロードリンクで渡してください。','','■ 動き：'+pt[0],descs[idx],'・'+n+'コマ、1コマ '+D+'ミリ秒（合計'+S+'秒）、ループ'+L+'回、サイズ '+W+'×'+H+'px','・コマ割り（0%＝元のポーズ、100%＝動きの頂点。ゆっくり動き始め、ゆっくり止まる）：',beats.join('\n'),'・'+SMOOTH].join('\n');
 return ['添付の参考画像の犬を主役にして、動くGIFを1つ作成してください。完成したら '+fn+' をダウンロードリンクで渡してください。','','■ 動き：'+pt[0],descs[idx],'・'+n+'コマ、1コマ '+D+'ミリ秒（合計'+S+'秒）、ループ'+L+'回（再生時間×ループは4秒以内）','・コマ割り（0%＝元のポーズ、100%＝動きの頂点。ゆっくり動き始め、ゆっくり止まる）：',beats.join('\n'),'・'+SMOOTH,'','■ 共通ルール',commonText().split('\n').slice(2).join('\n')].join('\n')}
 function refresh(){$('nm').textContent='パターン '+(idx+1)+' / 27：'+PATTERNS[idx][0];$('desc').value=descs[idx];$('pc').value=commonText();$('cs').hidden=$('mode').value!=='short';$('p').value=pr();[...$('chips').children].forEach((b,i)=>b.classList.toggle('on',i===idx))}
@@ -84,7 +85,7 @@ $('desc').oninput=()=>{descs[idx]=$('desc').value;$('p').value=pr()};
 $('prev').onclick=()=>{idx=(idx+26)%27;refresh()};$('next').onclick=()=>{idx=(idx+1)%27;refresh()};
 async function cp(id){let ta=$(id);try{await navigator.clipboard.writeText(ta.value);st('コピーしました')}catch{ta.select();st('選択した文章を手動でコピーしてください')}}
 $('c').onclick=()=>cp('p');$('cc').onclick=()=>cp('pc');
-['mode','dog','touch','bg','frames','size','loops'].forEach(id=>$(id).addEventListener('change',refresh));$('dog').addEventListener('input',refresh);
+['out','mode','dog','touch','bg','frames','size','loops'].forEach(id=>$(id).addEventListener('change',refresh));$('dog').addEventListener('input',refresh);
 $('sec').onchange=()=>{syncLoops();refresh()};
 syncLoops();refresh();
 </script></html>
